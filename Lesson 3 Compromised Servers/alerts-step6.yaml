@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  Email:
+    Description: Your email address that will be attached to the SNS Topic
+    Type: String
+    Default: you@example.com
+  NewLogGroupName:
+    Description: The name of the log group to be created
+    Type: String
+    Default: EDS-Lesson3
+  VPCImportName:
+    Description: This name will match the exported value from webapp stack
+    Type: String
+    Default: webapp:Lesson3-VPC
+  SubscriptionFilterPattern:
+    Description: Amazon VPC Flow Logs Filter Pattern to track OUTGOING traffic (instance -> internet) from the VPC (10.0.*) 
+    Type: String
+    Default: '[version, account_id, interface_id, srcaddr != "-", dstaddr != "10.0.*", srcport != "-", dstport != "-", protocol, packets, bytes, start, end, action, log_status]'
+Resources:
+  InstanceKiller:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: instance_killer/instance_killer.lambda_handler
+      Runtime: python2.7
+      Timeout: 60
+      MemorySize: 1024
+      Events:
+        FlowLogLogged:
+          Type: CloudWatchLogs
+          Properties:
+            LogGroupName: !Ref NewLogGroupName
+            FilterPattern: !Ref SubscriptionFilterPattern
+      Environment:
+        Variables:
+          SNSARN: !Ref SNSTopic
+      Policies:
+        Statement:
+          - Effect: Allow
+            Action:
+            - ec2:DescribeNetworkInterfaces
+            - ec2:DescribeVolumes
+            - ec2:CreateSnapshot
+            - ec2:StopInstances
+            - ec2:TerminateInstances
+            Resource: "*"
+          - Effect: Allow
+            Action:
+            - sns:Publish
+            Resource: "*"
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: Lesson3
+      Subscription:
+        - Endpoint: !Ref Email
+          Protocol: email
+  FlowLogs:
+    Type: AWS::EC2::FlowLog
+    Properties:
+      DeliverLogsPermissionArn : !GetAtt FlowLogsRole.Arn
+      LogGroupName : !Ref NewLogGroupName
+      ResourceId :
+        Fn::ImportValue: !Ref VPCImportName
+      ResourceType : VPC
+      TrafficType : ALL
+  FlowLogsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - vpc-flow-logs.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: flowlogs-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                Resource: "*"

@@ -1,0 +1,54 @@
+Parameters:
+  Email:
+    Description: Your email address that will be attached to the SNS Topic
+    Type: String
+    Default: you@example.com
+  NewLogGroupName:
+    Description: The name of the log group to be created
+    Type: String
+    Default: EDS-Lesson3
+  VPCImportName:
+    Description: This name will match the exported value from webapp stack
+    Type: String
+    Default: webapp:Lesson3-VPC
+Resources:
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: Lesson3
+      Subscription:
+        - Endpoint: !Ref Email
+          Protocol: email
+  FlowLogs:
+    Type: AWS::EC2::FlowLog
+    Properties:
+      DeliverLogsPermissionArn : !GetAtt FlowLogsRole.Arn
+      LogGroupName : !Ref NewLogGroupName
+      ResourceId :
+        Fn::ImportValue: !Ref VPCImportName
+      ResourceType : VPC
+      TrafficType : ALL
+  FlowLogsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - vpc-flow-logs.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: flowlogs-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                Resource: "*"

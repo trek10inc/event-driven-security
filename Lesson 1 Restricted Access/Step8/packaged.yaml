@@ -1,0 +1,26 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Event Driven Security - Lesson 1 Step 4
+Globals:
+  Function:
+    Runtime: python3.6
+    Timeout: 6
+Parameters:
+  AlertRoles:
+    Description: Roles that would should alert when someone assumes them
+    Type: String
+  WebhookUrl:
+    Description: What webhook should we alert. Testing? Try https://webhook.site/
+    Type: String
+Resources:
+  AssumptionAlertFunction:
+    Properties:
+      CodeUri: s3://cloudformation-packaging-400043138426/9907f46ca6eaa116abfd5964adf46988
+      Environment:
+        Variables:
+          ALERT_ROLES:
+            Ref: AlertRoles
+          WEBHOOK_URL:
+            Ref: WebhookUrl
+      Handler: handler.lambda_handler
+    Type: AWS::Serverless::Function
+Transform: AWS::Serverless-2016-10-31

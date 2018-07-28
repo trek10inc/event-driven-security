@@ -1,0 +1,54 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Event Driven Security - Lesson 1 Step 2"
+Resources:
+  AdminIAMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "administrator"
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AdministratorAccess"
+  AdminIAMGroup:
+    Type: "AWS::IAM::Group"
+    Properties:
+      GroupName: "admins"
+      Policies:
+        - PolicyName: "allowRoleAssume"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: "assumeAdminRole"
+                Effect: "Allow"
+                Action: "sts:AssumeRole"
+                Resource: !GetAtt AdminIAMRole.Arn
+
+Outputs:
+  RoleArn:
+    Description: The Admin IAM Group ARN
+    Value: !GetAtt AdminIAMRole.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-RoleARN
+  RoleName:
+    Description: The Admin IAM Group Name
+    Value: !Ref AdminIAMRole
+    Export:
+      Name: !Sub ${AWS::StackName}-RoleName
+  
+  GroupArn:
+    Description: The Admin IAM Group ARN
+    Value: !GetAtt AdminIAMGroup.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-GroupARN
+  GroupName:
+    Description: The Admin IAM Group Name
+    Value: !Ref AdminIAMGroup
+    Export:
+      Name: !Sub ${AWS::StackName}-GroupName

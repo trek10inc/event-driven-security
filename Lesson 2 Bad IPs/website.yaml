@@ -1,0 +1,120 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  SiteBucket:
+    Type: AWS::S3::Bucket
+
+  # This policy restricts S3 bucket read access to only Cloudfront, to force access through the CDN.
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Statement:
+          - Sid: "Grant a CloudFront Origin Identity access to support private content"
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource: !Sub arn:aws:s3:::${SiteBucket}/*
+            Principal:
+              CanonicalUser: !GetAtt OriginAccessIdentityID.S3CanonicalUserId
+
+  OriginAccessIdentityID:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: Website OAI - Origin Access Identity will allow CloudFront to speak with S3 while keeping the bucket private
+
+  SiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Origins:
+        - DomainName: !GetAtt SiteBucket.DomainName
+          Id: !Sub ${AWS::StackName}-S3Origin
+          S3OriginConfig:
+            OriginAccessIdentity: !Sub origin-access-identity/cloudfront/${OriginAccessIdentityID}
+        DefaultCacheBehavior:
+          TargetOriginId: !Sub ${AWS::StackName}-S3Origin
+          DefaultTTL: 0
+          MaxTTL: 0
+          MinTTL: 0
+          ForwardedValues:
+            QueryString: 'false'
+          ViewerProtocolPolicy: redirect-to-https
+        WebACLId: !Ref WebACL
+        # CustomErrorResponses:
+        # - ErrorCode: '404'
+        #   ResponsePagePath: "/index.html"
+        #   ResponseCode: '200'
+        #   ErrorCachingMinTTL: '30'
+        # - ErrorCode: '403'
+        #   ResponsePagePath: "/index.html"
+        #   ResponseCode: '200'
+        #   ErrorCachingMinTTL: '30'
+
+
+  BapIP:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: bad-ip.handler
+      Runtime: python2.7
+      Timeout: 60
+      MemorySize: 1024
+      Policies:
+        Statement:
+          - Effect: Allow
+            Action:
+            - waf:GetChangeToken
+            - waf:GetChangeTokenStatus
+            Resource: "*"
+          - Effect: Allow
+            Action:
+            - waf:GetIPSet
+            - waf:UpdateIPSet
+            Resource: !Sub arn:aws:waf::${AWS::AccountId}:ipset/${IPSet}
+      Events:
+        UpdateBadIpList:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 hour)
+      Environment:
+        Variables:
+          IPSET: !Ref IPSet
+
+  IPSet:
+    Type: AWS::WAF::IPSet
+    Properties:
+      Name: SANS IPs
+  Rule:
+    Type: AWS::WAF::Rule
+    Properties:
+      Name: SANS Rule
+      MetricName: sansRule
+      Predicates:
+      - DataId: !Ref IPSet
+        Type: IPMatch
+        Negated: 'false'
+  WebACL:
+    Type: AWS::WAF::WebACL
+    Properties:
+      Name: WebACL
+      DefaultAction:
+        Type: ALLOW
+      MetricName: WebACL
+      Rules:
+      - Action:
+          Type: BLOCK
+        Priority: 1
+        RuleId: !Ref Rule
+
+Outputs:
+  SiteUploadBucket:
+    Description: Bucket for the website content (html, javascript, css)
+    Value: !Sub s3://${SiteBucket}
+  Endpoint:
+    Description: Application Address
+    Value: !Sub https://${SiteDistribution.DomainName}

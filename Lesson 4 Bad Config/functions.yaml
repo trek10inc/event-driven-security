@@ -1,0 +1,216 @@
+
+Resources:
+  VPC:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: "10.0.0.0/16"
+      Tags:
+        - Key: Name
+          Value: Lesson4
+  IGW:
+    Type: "AWS::EC2::InternetGateway"
+  GatewayAttach:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      InternetGatewayId: !Ref IGW
+      VpcId: !Ref VPC
+  SubnetA:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs ]
+      CidrBlock: "10.0.1.0/24"
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref VPC
+  SubnetB:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: !Select [1, !GetAZs ]
+      CidrBlock: "10.0.2.0/24"
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref VPC
+  RouteTablePublic:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+  RouteDefaultPublic:
+    Type: "AWS::EC2::Route"
+    DependsOn: GatewayAttach
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref IGW
+      RouteTableId: !Ref RouteTablePublic
+  SubnetRouteTableAssociationA:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref RouteTablePublic
+      SubnetId: !Ref SubnetA
+  SubnetRouteTableAssociationB:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref RouteTablePublic
+      SubnetId: !Ref SubnetB
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: root
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            - ec2:CreateNetworkInterface
+            - ec2:DescribeNetworkInterfaces
+            - ec2:DeleteNetworkInterface
+            Resource: '*'
+  Lambda1:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        ZipFile: |
+          def lambda_handler(event,context):
+              print "Hello World!"
+      FunctionName: test-badconfig-1
+      Handler: index.lambda_handler
+      Role : !GetAtt LambdaExecutionRole.Arn
+      Runtime: python2.7
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref SG1
+        SubnetIds:
+          - !Ref SubnetA
+  Lambda2:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        ZipFile: |
+          def lambda_handler(event,context):
+              print "Hello World!"
+      FunctionName: test-badconfig-2
+      Handler: index.lambda_handler
+      Role : !GetAtt LambdaExecutionRole.Arn
+      Runtime: python2.7
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref SG2
+        SubnetIds:
+          - !Ref SubnetA
+  Lambda3:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        ZipFile: |
+          def lambda_handler(event,context):
+              print "Hello World!"
+      FunctionName: test-badconfig-3
+      Handler: index.lambda_handler
+      Role : !GetAtt LambdaExecutionRole.Arn
+      Runtime: python2.7
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref SG3
+        SubnetIds:
+          - !Ref SubnetA
+  Lambda4:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        ZipFile: |
+          def lambda_handler(event,context):
+              print "Hello World!"
+      FunctionName: test-badconfig-4
+      Handler: index.lambda_handler
+      Role : !GetAtt LambdaExecutionRole.Arn
+      Runtime: python2.7
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref SG1
+        SubnetIds:
+          - !Ref SubnetA
+
+  SG1:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "test-group-1"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        -
+          CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          ToPort: "80"
+          FromPort: "80"
+        -
+          CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          ToPort: "22"
+          FromPort: "22"
+      SecurityGroupEgress:
+        -
+          CidrIp: 0.0.0.0/0
+          ToPort: "-1"
+          IpProtocol: "-1"
+      Tags:
+        - Key: Name
+          Value: test-1
+  SG2:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "test-group-2"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        -
+          CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          ToPort: "80"
+          FromPort: "80"
+        -
+          CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          ToPort: "8080"
+          FromPort: "8080"
+      SecurityGroupEgress:
+        -
+          CidrIp: 0.0.0.0/0
+          ToPort: "-1"
+          IpProtocol: "-1"
+      Tags:
+        - Key: Name
+          Value: test-2
+  SG3:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "test-group-2"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        -
+          CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          ToPort: "80"
+          FromPort: "80"
+        -
+          CidrIp: 1.2.3.4/32
+          IpProtocol: tcp
+          ToPort: "22"
+          FromPort: "22"
+      SecurityGroupEgress:
+        -
+          CidrIp: 0.0.0.0/0
+          ToPort: "-1"
+          IpProtocol: "-1"
+      Tags:
+        - Key: Name
+          Value: test-3
+  

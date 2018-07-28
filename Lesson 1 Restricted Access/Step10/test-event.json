@@ -1,0 +1,35 @@
+{
+    "version": "0",
+    "id": "c45c2c17-b322-8fb3-5dde-aef0488605d1",
+    "detail-type": "AWS Console Sign In via CloudTrail",
+    "source": "aws.signin",
+    "account": "123456789101",
+    "time": "2018-07-12T18:58:51Z",
+    "region": "us-east-1",
+    "resources": [],
+    "detail": {
+        "eventVersion": "1.05",
+        "userIdentity": {
+            "type": "AssumedRole",
+            "principalId": "AROAIV35T4DJ5RPWJUTKU:Helen",
+            "arn": "arn:aws:sts::123456789101:assumed-role/administrator/Helen",
+            "accountId": "123456789101"
+        },
+        "eventTime": "2018-07-12T18:58:51Z",
+        "eventSource": "signin.amazonaws.com",
+        "eventName": "SwitchRole",
+        "awsRegion": "global",
+        "sourceIPAddress": "66.44.45.168",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; WOW64; rv:54.0) Gecko/20100101 Firefox/54.0",
+        "requestParameters": null,
+        "responseElements": {
+            "SwitchRole": "Success"
+        },
+        "additionalEventData": {
+            "SwitchFrom": "arn:aws:iam::123456789101:user/Helen",
+            "RedirectTo": "https://console.aws.amazon.com/ec2/v2/home?region=us-east-1#Home:"
+        },
+        "eventID": "bd1ccdec-b8fb-49a2-8621-949bbdd96633",
+        "eventType": "AwsConsoleSignIn"
+    }
+}

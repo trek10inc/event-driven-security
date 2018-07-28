@@ -1,0 +1,13 @@
+Parameters:
+  Email: 
+    Description: Your email address that will be attached to the SNS Topic
+    Type: String
+    Default: you@example.com
+Resources:
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: Lesson3
+      Subscription:
+        - Endpoint: !Ref Email
+          Protocol: email

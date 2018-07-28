@@ -1,0 +1,122 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Outputs:
+  Endpoint:
+    Description: Application Address
+    Value:
+      Fn::Sub: https://${SiteDistribution.DomainName}
+  SiteUploadBucket:
+    Description: Bucket for the website content (html, javascript, css)
+    Value:
+      Fn::Sub: s3://${SiteBucket}
+Resources:
+  BapIP:
+    Properties:
+      CodeUri: s3://serverless-deployments-us-east-1-491142528373/e95c6bd40329da89c06fded29e412757
+      Environment:
+        Variables:
+          IPSET:
+            Ref: IPSet
+      Events:
+        UpdateBadIpList:
+          Properties:
+            Schedule: rate(1 hour)
+          Type: Schedule
+      Handler: bad-ip.handler
+      MemorySize: 1024
+      Policies:
+        Statement:
+        - Action:
+          - waf:GetChangeToken
+          - waf:GetChangeTokenStatus
+          Effect: Allow
+          Resource: '*'
+        - Action:
+          - waf:GetIPSet
+          - waf:UpdateIPSet
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:waf::${AWS::AccountId}:ipset/${IPSet}
+      Runtime: python2.7
+      Timeout: 60
+    Type: AWS::Serverless::Function
+  IPSet:
+    Properties:
+      Name: SANS IPs
+    Type: AWS::WAF::IPSet
+  OriginAccessIdentityID:
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: Website OAI - Origin Access Identity will allow CloudFront to speak
+          with S3 while keeping the bucket private
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+  Rule:
+    Properties:
+      MetricName: sansRule
+      Name: SANS Rule
+      Predicates:
+      - DataId:
+          Ref: IPSet
+        Negated: 'false'
+        Type: IPMatch
+    Type: AWS::WAF::Rule
+  SiteBucket:
+    Type: AWS::S3::Bucket
+  SiteBucketPolicy:
+    Properties:
+      Bucket:
+        Ref: SiteBucket
+      PolicyDocument:
+        Statement:
+        - Action:
+          - s3:GetObject
+          Effect: Allow
+          Principal:
+            CanonicalUser:
+              Fn::GetAtt:
+              - OriginAccessIdentityID
+              - S3CanonicalUserId
+          Resource:
+            Fn::Sub: arn:aws:s3:::${SiteBucket}/*
+          Sid: Grant a CloudFront Origin Identity access to support private content
+    Type: AWS::S3::BucketPolicy
+  SiteDistribution:
+    Properties:
+      DistributionConfig:
+        DefaultCacheBehavior:
+          DefaultTTL: 0
+          ForwardedValues:
+            QueryString: 'false'
+          MaxTTL: 0
+          MinTTL: 0
+          TargetOriginId:
+            Fn::Sub: ${AWS::StackName}-S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+        DefaultRootObject: index.html
+        Enabled: true
+        Origins:
+        - DomainName:
+            Fn::GetAtt:
+            - SiteBucket
+            - DomainName
+          Id:
+            Fn::Sub: ${AWS::StackName}-S3Origin
+          S3OriginConfig:
+            OriginAccessIdentity:
+              Fn::Sub: origin-access-identity/cloudfront/${OriginAccessIdentityID}
+        WebACLId:
+          Ref: WebACL
+    Type: AWS::CloudFront::Distribution
+  WebACL:
+    Properties:
+      DefaultAction:
+        Type: ALLOW
+      MetricName: WebACL
+      Name: WebACL
+      Rules:
+      - Action:
+          Type: BLOCK
+        Priority: 1
+        RuleId:
+          Ref: Rule
+    Type: AWS::WAF::WebACL
+Transform: AWS::Serverless-2016-10-31
