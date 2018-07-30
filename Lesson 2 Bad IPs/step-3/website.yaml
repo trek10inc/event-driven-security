@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  SiteBucket:
+    Type: AWS::S3::Bucket
+
+  SiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Origins:
+        - DomainName: !GetAtt SiteBucket.DomainName
+          Id: !Sub ${AWS::StackName}-S3Origin
+          S3OriginConfig:
+            OriginAccessIdentity: !Sub origin-access-identity/cloudfront/${OriginAccessIdentityID}
+        DefaultCacheBehavior:
+          TargetOriginId: !Sub ${AWS::StackName}-S3Origin
+          DefaultTTL: 0
+          MaxTTL: 0
+          MinTTL: 0
+          ForwardedValues:
+            QueryString: 'false'
+          ViewerProtocolPolicy: redirect-to-https
+
+  # This policy restricts S3 bucket read access to only Cloudfront, to force access through the CDN.
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Statement:
+          - Sid: "Grant a CloudFront Origin Identity access to support private content"
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource: !Sub arn:aws:s3:::${SiteBucket}/*
+            Principal:
+              CanonicalUser: !GetAtt OriginAccessIdentityID.S3CanonicalUserId
+
+  OriginAccessIdentityID:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: Website OAI - Origin Access Identity will allow CloudFront to speak with S3 while keeping the bucket private
+
+Outputs:
+  SiteUploadBucket:
+    Description: Bucket for the website content (html, javascript, css)
+    Value: !Sub s3://${SiteBucket}
+  Endpoint:
+    Description: Application Address
+    Value: !Sub https://${SiteDistribution.DomainName}

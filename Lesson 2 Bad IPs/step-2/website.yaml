@@ -1,0 +1,7 @@
+Resources:
+  SiteBucket:
+    Type: AWS::S3::Bucket
+Outputs:
+  SiteUploadBucket:
+    Description: Bucket for the website content (html, javascript, css)
+    Value: !Sub s3://${SiteBucket}
